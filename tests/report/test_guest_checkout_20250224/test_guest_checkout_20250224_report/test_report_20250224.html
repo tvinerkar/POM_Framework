@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>test_report_20250224.html</h1>
+    <p>Report generated on 24-Feb-2025 at 10:34:20 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Base URL</td>
+        <td></td></tr>
+      <tr>
+        <td>Capabilities</td>
+        <td>{}</td></tr>
+      <tr>
+        <td>Driver</td>
+        <td>None</td></tr>
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files\Zulu\zulu-21\bin</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.5.0", "py": "1.11.0", "pytest": "7.4.4"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.26100-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.13.2", "base-url": "2.0.0", "html": "3.1.1", "metadata": "2.0.2", "parallel": "0.1.1", "selenium": "4.0.1", "variables": "3.0.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.10.4</td></tr></table>
+    <h2>Summary</h2>
+    <p>3 tests ran in 110.26 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">0 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">3 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_guest_checkout.py::TestGuestCheckout::test_guest_checkout[chrome]</td>
+          <td class="col-duration">30.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;POM_Framework.tests.test_guest_checkout.TestGuestCheckout object at 0x000001690D9F1FF0&gt;<br/><br/>    def test_guest_checkout(self):<br/>        test_name = &quot;test_guest_checkout&quot;  # Test case name for screenshots<br/>        home = HomePage(self.driver)<br/>        product = ProductPage(self.driver)<br/>        checkout = CheckoutPage(self.driver)<br/>    <br/>        home.open_url(&quot;https://preprod.zodiaconline.com/&quot;)<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;01_HomePageLoaded&quot;)  # Capture screenshot<br/>    <br/>        home.navigate_to_shirts()<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;02_NavigatedToShirts&quot;)<br/>    <br/>        product.select_first_product()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;03_ProductPageLoaded&quot;)<br/>    <br/>        assert product.validate_product_name_and_breadcrumb(), &quot;Mismatch between breadcrumb and product name&quot;<br/>        assert product.validate_swatch_images(), &quot;Less than 2 swatch images found&quot;<br/>    <br/>        product.select_size()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;04_SelectedSize&quot;)<br/>    <br/>        product.add_to_cart()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;05_AddedToCart&quot;)<br/>    <br/>&gt;       assert product.validate_view_cart_button(), &quot;View Cart button is not visible&quot;<br/><br/>test_guest_checkout.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/>..\pages\product_page.py:35: in validate_view_cart_button<br/>    return WebDriverWait(self.driver, 10).until(<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/><br/>self = &lt;selenium.webdriver.support.wait.WebDriverWait (session=&quot;5cad962dd0bce381cd83d168583df968&quot;)&gt;<br/>method = &lt;function visibility_of_element_located.&lt;locals&gt;._predicate at 0x000001690DA06DD0&gt;<br/>message = &#x27;&#x27;<br/><br/>    def until(self, method: Callable[[D], Union[Literal[False], T]], message: str = &quot;&quot;) -&gt; T:<br/>        &quot;&quot;&quot;Wait until the method returns a value that is not False.<br/>    <br/>        Calls the method provided with the driver as an argument until the<br/>        return value does not evaluate to ``False``.<br/>    <br/>        Parameters:<br/>        ----------<br/>        method: callable(WebDriver)<br/>            - A callable object that takes a WebDriver instance as an argument.<br/>    <br/>        message: str<br/>            - Optional message for :exc:`TimeoutException`<br/>    <br/>        Return:<br/>        -------<br/>        object: T<br/>            - The result of the last call to `method`<br/>    <br/>        Raises:<br/>        -------<br/>        TimeoutException<br/>            - If &#x27;method&#x27; does not return a truthy value within the WebDriverWait<br/>            object&#x27;s timeout<br/>    <br/>        Example:<br/>        --------<br/>        &gt;&gt;&gt; from selenium.webdriver.common.by import By<br/>        &gt;&gt;&gt; from selenium.webdriver.support.ui import WebDriverWait<br/>        &gt;&gt;&gt; from selenium.webdriver.support import expected_conditions as EC<br/>    <br/>        # Wait until an element is visible on the page<br/>        &gt;&gt;&gt; wait = WebDriverWait(driver, 10)<br/>        &gt;&gt;&gt; element = wait.until(EC.visibility_of_element_located((By.ID, &quot;exampleId&quot;)))<br/>        &gt;&gt;&gt; print(element.text)<br/>        &quot;&quot;&quot;<br/>        screen = None<br/>        stacktrace = None<br/>    <br/>        end_time = time.monotonic() + self._timeout<br/>        while True:<br/>            try:<br/>                value = method(self._driver)<br/>                if value:<br/>                    return value<br/>            except self._ignored_exceptions as exc:<br/>                screen = getattr(exc, &quot;screen&quot;, None)<br/>                stacktrace = getattr(exc, &quot;stacktrace&quot;, None)<br/>            if time.monotonic() &gt; end_time:<br/>                break<br/>            time.sleep(self._poll)<br/>&gt;       raise TimeoutException(message, screen, stacktrace)<br/><span class="error">E       selenium.common.exceptions.TimeoutException: Message: </span><br/><span class="error">E       Stacktrace:</span><br/><span class="error">E       	GetHandleVerifier [0x00F30283+25139]</span><br/><span class="error">E       	(No symbol) [0x00EBB234]</span><br/><span class="error">E       	(No symbol) [0x00D904A3]</span><br/><span class="error">E       	(No symbol) [0x00DD8338]</span><br/><span class="error">E       	(No symbol) [0x00DD868B]</span><br/><span class="error">E       	(No symbol) [0x00E20F62]</span><br/><span class="error">E       	(No symbol) [0x00DFCF84]</span><br/><span class="error">E       	(No symbol) [0x00E1E6E1]</span><br/><span class="error">E       	(No symbol) [0x00DFCD36]</span><br/><span class="error">E       	(No symbol) [0x00DCBD29]</span><br/><span class="error">E       	(No symbol) [0x00DCD064]</span><br/><span class="error">E       	GetHandleVerifier [0x0123B143+3215603]</span><br/><span class="error">E       	GetHandleVerifier [0x012522BA+3310186]</span><br/><span class="error">E       	GetHandleVerifier [0x0124C4D2+3286146]</span><br/><span class="error">E       	GetHandleVerifier [0x00FC9C80+654384]</span><br/><span class="error">E       	(No symbol) [0x00EC45BD]</span><br/><span class="error">E       	(No symbol) [0x00EC14A8]</span><br/><span class="error">E       	(No symbol) [0x00EC1647]</span><br/><span class="error">E       	(No symbol) [0x00EB3D20]</span><br/><span class="error">E       	(No symbol) [0x751F5D49]</span><br/><span class="error">E       	RtlInitializeExceptionChain [0x771ACDEB+107]</span><br/><span class="error">E       	RtlGetAppContainerNamedObjectPath [0x771ACD71+561]</span><br/><br/>..\..\..\AppData\Local\Programs\Python\Python310\lib\site-packages\selenium\webdriver\support\wait.py:146: TimeoutExceptionitem = &lt;Function test_guest_checkout[chrome]&gt;<br/>nextitem = &lt;Function test_guest_checkout[firefox]&gt;<br/><br/>    @pytest.hookimpl(tryfirst=True, hookwrapper=True)<br/>    def pytest_runtest_teardown(item, nextitem):<br/>        &quot;&quot;&quot;Save screenshots of successful test cases in the screenshots folder.&quot;&quot;&quot;<br/>        outcome = yield<br/>        report: TestReport = outcome.get_result()<br/>    <br/>&gt;       if report.when == &quot;call&quot; and report.passed:<br/><span class="error">E       AttributeError: &#x27;list&#x27; object has no attribute &#x27;when&#x27;</span><br/><br/>..\conftest.py:99: AttributeError<br/> ------------------------------Captured stdout call------------------------------ <br/>Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_01_HomePageLoaded_chrome_133.0.6943.99_20250224_1032.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_02_NavigatedToShirts_chrome_133.0.6943.99_20250224_1032.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_03_ProductPageLoaded_chrome_133.0.6943.99_20250224_1032.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_04_SelectedSize_chrome_133.0.6943.99_20250224_1032.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_05_AddedToCart_chrome_133.0.6943.99_20250224_1032.png
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_guest_checkout.py::TestGuestCheckout::test_guest_checkout[firefox]</td>
+          <td class="col-duration">40.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;POM_Framework.tests.test_guest_checkout.TestGuestCheckout object at 0x000001690D9F1F30&gt;<br/><br/>    def test_guest_checkout(self):<br/>        test_name = &quot;test_guest_checkout&quot;  # Test case name for screenshots<br/>        home = HomePage(self.driver)<br/>        product = ProductPage(self.driver)<br/>        checkout = CheckoutPage(self.driver)<br/>    <br/>        home.open_url(&quot;https://preprod.zodiaconline.com/&quot;)<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;01_HomePageLoaded&quot;)  # Capture screenshot<br/>    <br/>        home.navigate_to_shirts()<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;02_NavigatedToShirts&quot;)<br/>    <br/>        product.select_first_product()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;03_ProductPageLoaded&quot;)<br/>    <br/>        assert product.validate_product_name_and_breadcrumb(), &quot;Mismatch between breadcrumb and product name&quot;<br/>        assert product.validate_swatch_images(), &quot;Less than 2 swatch images found&quot;<br/>    <br/>        product.select_size()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;04_SelectedSize&quot;)<br/>    <br/>        product.add_to_cart()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;05_AddedToCart&quot;)<br/>    <br/>&gt;       assert product.validate_view_cart_button(), &quot;View Cart button is not visible&quot;<br/><br/>test_guest_checkout.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/>..\pages\product_page.py:35: in validate_view_cart_button<br/>    return WebDriverWait(self.driver, 10).until(<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/><br/>self = &lt;selenium.webdriver.support.wait.WebDriverWait (session=&quot;b66c354e-a3ab-44c1-a9fb-55b0a9a36a1c&quot;)&gt;<br/>method = &lt;function visibility_of_element_located.&lt;locals&gt;._predicate at 0x000001690DB0CDC0&gt;<br/>message = &#x27;&#x27;<br/><br/>    def until(self, method: Callable[[D], Union[Literal[False], T]], message: str = &quot;&quot;) -&gt; T:<br/>        &quot;&quot;&quot;Wait until the method returns a value that is not False.<br/>    <br/>        Calls the method provided with the driver as an argument until the<br/>        return value does not evaluate to ``False``.<br/>    <br/>        Parameters:<br/>        ----------<br/>        method: callable(WebDriver)<br/>            - A callable object that takes a WebDriver instance as an argument.<br/>    <br/>        message: str<br/>            - Optional message for :exc:`TimeoutException`<br/>    <br/>        Return:<br/>        -------<br/>        object: T<br/>            - The result of the last call to `method`<br/>    <br/>        Raises:<br/>        -------<br/>        TimeoutException<br/>            - If &#x27;method&#x27; does not return a truthy value within the WebDriverWait<br/>            object&#x27;s timeout<br/>    <br/>        Example:<br/>        --------<br/>        &gt;&gt;&gt; from selenium.webdriver.common.by import By<br/>        &gt;&gt;&gt; from selenium.webdriver.support.ui import WebDriverWait<br/>        &gt;&gt;&gt; from selenium.webdriver.support import expected_conditions as EC<br/>    <br/>        # Wait until an element is visible on the page<br/>        &gt;&gt;&gt; wait = WebDriverWait(driver, 10)<br/>        &gt;&gt;&gt; element = wait.until(EC.visibility_of_element_located((By.ID, &quot;exampleId&quot;)))<br/>        &gt;&gt;&gt; print(element.text)<br/>        &quot;&quot;&quot;<br/>        screen = None<br/>        stacktrace = None<br/>    <br/>        end_time = time.monotonic() + self._timeout<br/>        while True:<br/>            try:<br/>                value = method(self._driver)<br/>                if value:<br/>                    return value<br/>            except self._ignored_exceptions as exc:<br/>                screen = getattr(exc, &quot;screen&quot;, None)<br/>                stacktrace = getattr(exc, &quot;stacktrace&quot;, None)<br/>            if time.monotonic() &gt; end_time:<br/>                break<br/>            time.sleep(self._poll)<br/>&gt;       raise TimeoutException(message, screen, stacktrace)<br/><span class="error">E       selenium.common.exceptions.TimeoutException: Message: </span><br/><span class="error">E       Stacktrace:</span><br/><span class="error">E       RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8</span><br/><span class="error">E       WebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5</span><br/><span class="error">E       NoSuchElementError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:511:5</span><br/><span class="error">E       dom.find/&lt;/&lt;@chrome://remote/content/shared/DOM.sys.mjs:136:16</span><br/><br/>..\..\..\AppData\Local\Programs\Python\Python310\lib\site-packages\selenium\webdriver\support\wait.py:146: TimeoutExceptionitem = &lt;Function test_guest_checkout[firefox]&gt;<br/>nextitem = &lt;Function test_guest_checkout[edge]&gt;<br/><br/>    @pytest.hookimpl(tryfirst=True, hookwrapper=True)<br/>    def pytest_runtest_teardown(item, nextitem):<br/>        &quot;&quot;&quot;Save screenshots of successful test cases in the screenshots folder.&quot;&quot;&quot;<br/>        outcome = yield<br/>        report: TestReport = outcome.get_result()<br/>    <br/>&gt;       if report.when == &quot;call&quot; and report.passed:<br/><span class="error">E       AttributeError: &#x27;list&#x27; object has no attribute &#x27;when&#x27;</span><br/><br/>..\conftest.py:99: AttributeError<br/> ------------------------------Captured stdout call------------------------------ <br/>Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_01_HomePageLoaded_firefox_128.7.0_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_02_NavigatedToShirts_firefox_128.7.0_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_03_ProductPageLoaded_firefox_128.7.0_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_04_SelectedSize_firefox_128.7.0_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_05_AddedToCart_firefox_128.7.0_20250224_1033.png
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_guest_checkout.py::TestGuestCheckout::test_guest_checkout[edge]</td>
+          <td class="col-duration">34.09</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;POM_Framework.tests.test_guest_checkout.TestGuestCheckout object at 0x000001690D9F1F00&gt;<br/><br/>    def test_guest_checkout(self):<br/>        test_name = &quot;test_guest_checkout&quot;  # Test case name for screenshots<br/>        home = HomePage(self.driver)<br/>        product = ProductPage(self.driver)<br/>        checkout = CheckoutPage(self.driver)<br/>    <br/>        home.open_url(&quot;https://preprod.zodiaconline.com/&quot;)<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;01_HomePageLoaded&quot;)  # Capture screenshot<br/>    <br/>        home.navigate_to_shirts()<br/>        time.sleep(1)<br/>        home.capture_screenshot(test_name, &quot;02_NavigatedToShirts&quot;)<br/>    <br/>        product.select_first_product()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;03_ProductPageLoaded&quot;)<br/>    <br/>        assert product.validate_product_name_and_breadcrumb(), &quot;Mismatch between breadcrumb and product name&quot;<br/>        assert product.validate_swatch_images(), &quot;Less than 2 swatch images found&quot;<br/>    <br/>        product.select_size()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;04_SelectedSize&quot;)<br/>    <br/>        product.add_to_cart()<br/>        time.sleep(1)<br/>        product.capture_screenshot(test_name, &quot;05_AddedToCart&quot;)<br/>    <br/>&gt;       assert product.validate_view_cart_button(), &quot;View Cart button is not visible&quot;<br/><br/>test_guest_checkout.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/>..\pages\product_page.py:35: in validate_view_cart_button<br/>    return WebDriverWait(self.driver, 10).until(<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _<br/><br/>self = &lt;selenium.webdriver.support.wait.WebDriverWait (session=&quot;cd00ee2487243f5250a0797f8b854be0&quot;)&gt;<br/>method = &lt;function visibility_of_element_located.&lt;locals&gt;._predicate at 0x000001690DB0D1B0&gt;<br/>message = &#x27;&#x27;<br/><br/>    def until(self, method: Callable[[D], Union[Literal[False], T]], message: str = &quot;&quot;) -&gt; T:<br/>        &quot;&quot;&quot;Wait until the method returns a value that is not False.<br/>    <br/>        Calls the method provided with the driver as an argument until the<br/>        return value does not evaluate to ``False``.<br/>    <br/>        Parameters:<br/>        ----------<br/>        method: callable(WebDriver)<br/>            - A callable object that takes a WebDriver instance as an argument.<br/>    <br/>        message: str<br/>            - Optional message for :exc:`TimeoutException`<br/>    <br/>        Return:<br/>        -------<br/>        object: T<br/>            - The result of the last call to `method`<br/>    <br/>        Raises:<br/>        -------<br/>        TimeoutException<br/>            - If &#x27;method&#x27; does not return a truthy value within the WebDriverWait<br/>            object&#x27;s timeout<br/>    <br/>        Example:<br/>        --------<br/>        &gt;&gt;&gt; from selenium.webdriver.common.by import By<br/>        &gt;&gt;&gt; from selenium.webdriver.support.ui import WebDriverWait<br/>        &gt;&gt;&gt; from selenium.webdriver.support import expected_conditions as EC<br/>    <br/>        # Wait until an element is visible on the page<br/>        &gt;&gt;&gt; wait = WebDriverWait(driver, 10)<br/>        &gt;&gt;&gt; element = wait.until(EC.visibility_of_element_located((By.ID, &quot;exampleId&quot;)))<br/>        &gt;&gt;&gt; print(element.text)<br/>        &quot;&quot;&quot;<br/>        screen = None<br/>        stacktrace = None<br/>    <br/>        end_time = time.monotonic() + self._timeout<br/>        while True:<br/>            try:<br/>                value = method(self._driver)<br/>                if value:<br/>                    return value<br/>            except self._ignored_exceptions as exc:<br/>                screen = getattr(exc, &quot;screen&quot;, None)<br/>                stacktrace = getattr(exc, &quot;stacktrace&quot;, None)<br/>            if time.monotonic() &gt; end_time:<br/>                break<br/>            time.sleep(self._poll)<br/>&gt;       raise TimeoutException(message, screen, stacktrace)<br/><span class="error">E       selenium.common.exceptions.TimeoutException: Message: </span><br/><span class="error">E       Stacktrace:</span><br/><span class="error">E       	GetHandleVerifier [0x00007FF745EEE735+13397]</span><br/><span class="error">E       	Microsoft::Applications::Events::EventProperty::empty [0x00007FF74617B1B4+2060276]</span><br/><span class="error">E       	Microsoft::Applications::Events::EventProperty::empty [0x00007FF7460D2338+1368440]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CC32A9]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CC349B]</span><br/><span class="error">E       	(No symbol) [0x00007FF745D040E7]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CE429F]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CB964D]</span><br/><span class="error">E       	(No symbol) [0x00007FF745D01C00]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CE3FC3]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CB8B96]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CB7E50]</span><br/><span class="error">E       	(No symbol) [0x00007FF745CB89C3]</span><br/><span class="error">E       	(No symbol) [0x00007FF745D40214]</span><br/><span class="error">E       	(No symbol) [0x00007FF745DD06CF]</span><br/><span class="error">E       	(No symbol) [0x00007FF745D43A53]</span><br/><span class="error">E       	Microsoft::Applications::Events::EventProperty::to_string [0x00007FF7462345BD+279981]</span><br/><span class="error">E       	simdutf::get_active_implementation [0x00007FF745E778C1+409457]</span><br/><span class="error">E       	simdutf::get_active_implementation [0x00007FF745E72BA4+389716]</span><br/><span class="error">E       	simdutf::get_active_implementation [0x00007FF745E72CE9+390041]</span><br/><span class="error">E       	simdutf::get_active_implementation [0x00007FF745E662E6+338326]</span><br/><span class="error">E       	(No symbol) [0x00007FFDAC31E8D7]</span><br/><span class="error">E       	RtlUserThreadStart [0x00007FFDAD7FBF2C+44]</span><br/><br/>..\..\..\AppData\Local\Programs\Python\Python310\lib\site-packages\selenium\webdriver\support\wait.py:146: TimeoutExceptionitem = &lt;Function test_guest_checkout[edge]&gt;, nextitem = None<br/><br/>    @pytest.hookimpl(tryfirst=True, hookwrapper=True)<br/>    def pytest_runtest_teardown(item, nextitem):<br/>        &quot;&quot;&quot;Save screenshots of successful test cases in the screenshots folder.&quot;&quot;&quot;<br/>        outcome = yield<br/>        report: TestReport = outcome.get_result()<br/>    <br/>&gt;       if report.when == &quot;call&quot; and report.passed:<br/><span class="error">E       AttributeError: &#x27;list&#x27; object has no attribute &#x27;when&#x27;</span><br/><br/>..\conftest.py:99: AttributeError<br/> ------------------------------Captured stdout call------------------------------ <br/>Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_01_HomePageLoaded_MicrosoftEdge_133.0.3065.69_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_02_NavigatedToShirts_MicrosoftEdge_133.0.3065.69_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_03_ProductPageLoaded_MicrosoftEdge_133.0.3065.69_20250224_1033.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_04_SelectedSize_MicrosoftEdge_133.0.3065.69_20250224_1034.png
+Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\report\test_guest_checkout_20250224\test_guest_checkout_20250224_Screenshots\test_guest_checkout_05_AddedToCart_MicrosoftEdge_133.0.3065.69_20250224_1034.png
+<br/></div></td></tr></tbody></table></body></html>
