@@ -12,53 +12,112 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from _pytest.runner import TestReport  # Import for type hinting
 
 def pytest_addoption(parser):
-    """Command-line option to select the browser."""
+    """Command-line option to select browsers for parallel execution."""
     parser.addoption("--browser", action="store", default="chrome", help="Choose browser: chrome, firefox, edge")
 
-@pytest.fixture(scope="class")
+@pytest.fixture(params=["chrome", "firefox", "edge"], scope="class")
 def driver(request):
     """Fixture to initialize WebDriver based on selected browser."""
-    browser = request.config.getoption("--browser")
+    browser = request.param
 
     if browser == "chrome":
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
+        options = webdriver.ChromeOptions()
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
     elif browser == "firefox":
-        driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()))
+        options = webdriver.FirefoxOptions()
+        driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()), options=options)
     elif browser == "edge":
-        driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()))
+        options = webdriver.EdgeOptions()
+        driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
     else:
         raise ValueError("Unsupported browser! Choose from chrome, firefox, or edge.")
 
+    # Fetch browser version
+    browser_version = driver.capabilities["browserVersion"]
+
     driver.maximize_window()
     driver.implicitly_wait(10)
+
     request.cls.driver = driver
+    request.cls.browser_name = browser
+    request.cls.browser_version = browser_version  # Store for screenshot naming
+
+    # Generate timestamped folder names
+    timestamp = datetime.now().strftime("%Y%m%d")
+    parent_folder = os.path.join(os.getcwd(), "report", f"test_guest_checkout_{timestamp}")
+    report_folder = os.path.join(parent_folder, f"test_guest_checkout_{timestamp}_report")
+    screenshot_folder = os.path.join(parent_folder, f"test_guest_checkout_{timestamp}_Screenshots")
+    failed_folder = os.path.join(parent_folder, f"TestGuestCheckout_{timestamp}_09_failed")
+
+    # Create necessary directories
+    os.makedirs(report_folder, exist_ok=True)
+    os.makedirs(screenshot_folder, exist_ok=True)
+    os.makedirs(failed_folder, exist_ok=True)
+
+    # Store folders in request object for later access
+    request.cls.parent_folder = parent_folder
+    request.cls.report_folder = report_folder
+    request.cls.screenshot_folder = screenshot_folder
+    request.cls.failed_folder = failed_folder
+
     yield driver
     driver.quit()
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Hook to capture screenshots on test failure and attach them to the HTML report."""
+    """Capture screenshots on test failure and attach them to the HTML report."""
     outcome = yield
     report: TestReport = outcome.get_result()
 
     if report.when == "call" and report.failed:
-        driver = item.funcargs.get("driver", None)  # Get WebDriver instance
+        driver = item.funcargs.get("driver", None)
         if driver:
-            test_name = item.nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            test_name = item.nodeid.split("::")[-2] if len(item.nodeid.split("::")) > 1 else "UnknownTest"
+            step_name = item.nodeid.split("::")[-1].replace("test_", "").replace("_", " ").capitalize()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            browser = item.funcargs["request"].cls.browser_name
+            version = item.funcargs["request"].cls.browser_version
 
-            # Ensure the screenshot directory exists
-            screenshot_dir = os.path.join(os.getcwd(), "report", "screenshots")
-            os.makedirs(screenshot_dir, exist_ok=True)
-
-            # Save screenshot
-            screenshot_path = os.path.join(screenshot_dir, f"{test_name}_{timestamp}.png")
-            driver.save_screenshot(screenshot_path)
-            print(f"📸 Screenshot saved on failure: {screenshot_path}")
+            # Save screenshot in the failed folder
+            failed_screenshot_path = os.path.join(item.funcargs["request"].cls.failed_folder, f"{test_name}_{step_name}_{timestamp}_{browser}_version_{version}.png")
+            driver.save_screenshot(failed_screenshot_path)
+            print(f"📸 Failed screenshot saved: {failed_screenshot_path}")
 
             # Attach screenshot to HTML report
             extra = getattr(report, "extra", [])
             if "pytest_html" in item.config.pluginmanager.list_name_plugin():
                 from pytest_html import extras
-                extra.append(extras.image(screenshot_path))
+                extra.append(extras.image(failed_screenshot_path))
                 report.extra = extra
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_teardown(item, nextitem):
+    """Save screenshots of successful test cases in the screenshots folder."""
+    outcome = yield
+    report: TestReport = outcome.get_result()
+
+    if report.when == "call" and report.passed:
+        driver = item.funcargs.get("driver", None)
+        if driver:
+            test_name = item.nodeid.split("::")[-2] if len(item.nodeid.split("::")) > 1 else "UnknownTest"
+            step_name = item.nodeid.split("::")[-1].replace("test_", "").replace("_", " ").capitalize()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            browser = item.funcargs["request"].cls.browser_name
+            version = item.funcargs["request"].cls.browser_version
+
+            # Save screenshot in the Screenshots folder
+            screenshot_path = os.path.join(item.funcargs["request"].cls.screenshot_folder, f"{test_name}_{step_name}_{browser}_{version}_{timestamp}.png")
+            driver.save_screenshot(screenshot_path)
+            print(f"📸 Passed screenshot saved: {screenshot_path}")
+
+def pytest_configure(config):
+    """Generate timestamped test report automatically in the report folder."""
+    timestamp = datetime.now().strftime("%Y%m%d")
+    parent_folder = os.path.join(os.getcwd(), "report", f"test_guest_checkout_{timestamp}")
+    report_folder = os.path.join(parent_folder, f"test_guest_checkout_{timestamp}_report")
+
+    # Ensure report directory exists
+    os.makedirs(report_folder, exist_ok=True)
+
+    report_file = os.path.join(report_folder, f"test_report_{timestamp}.html")
+    config.option.htmlpath = report_file  # Set report path dynamically

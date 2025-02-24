@@ -1,5 +1,4 @@
 import time
-
 import pytest
 from pages.home_page import HomePage
 from pages.product_page import ProductPage

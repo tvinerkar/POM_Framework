@@ -1,6 +1,7 @@
+import time
 from datetime import datetime  # Correct way
 import os
-
+import allure
 from selenium.common import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -41,21 +42,48 @@ class BasePage:
         except TimeoutException:
             return []  # Return empty list if no elements are found
 
+    # def capture_screenshot(self, test_name, step_name):
+    #     browser_name = self.driver.capabilities['browserName']
+    #     browser_version = self.driver.capabilities['browserVersion']
+    #     timestamp = time.strftime("%Y%m%d_%H%M")
+    #
+    #     # Format: testname_step_browser_version_timestamp.png
+    #     filename = f"{test_name}_{step_name}_{browser_name}_{browser_version}_{timestamp}.png"
+    #
+    #     # Ensure directory exists
+    #     screenshot_dir = os.path.join("report", "screenshots", f"{test_name}_{timestamp}")
+    #     os.makedirs(screenshot_dir, exist_ok=True)
+    #
+    #     # Save screenshot
+    #     screenshot_path = os.path.join(screenshot_dir, filename)
+    #     self.driver.save_screenshot(screenshot_path)
+    #     print(f"Screenshot saved: {screenshot_path}")
+
     def capture_screenshot(self, test_name, step_name):
-            """Captures and saves a screenshot with test name and step description."""
+        browser_name = self.driver.capabilities['browserName']
+        browser_version = self.driver.capabilities['browserVersion']
+        timestamp = time.strftime("%Y%m%d_%H%M")  # Full timestamp for filenames
+        date_stamp = time.strftime("%Y%m%d")  # Only date for folder naming
 
-            # Folder timestamp: YearMonthDay_Hour (e.g., 20250221_14)
-            folder_timestamp = datetime.now().strftime("%Y%m%d_%H")
-            folder_name = f"C:\\Users\\tejas.vinerkar\\PycharmProjects\\POM_Framework\\report\\screenshots\\{test_name}_{folder_timestamp}"
+        filename = f"{test_name}_{step_name}_{browser_name}_{browser_version}_{timestamp}.png"
 
-            # Ensure directory exists
-            if not os.path.exists(folder_name):
-                os.makedirs(folder_name)
+        # Base report directory
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tests/report"))
 
-            # Screenshot filename timestamp: screenshot name + YearMonthDay_HourMinute (e.g., 01_HomePageLoaded_20250221_1415.png)
-            screenshot_timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            screenshot_path = os.path.join(folder_name, f"{step_name}_{screenshot_timestamp}.png")
+        # 🔥 Dynamically generate directory names with the current date
+        screenshot_dir = os.path.join(base_dir, f"test_guest_checkout_{date_stamp}",
+                                      f"test_guest_checkout_{date_stamp}_Screenshots")
 
-            # Take screenshot
-            self.driver.save_screenshot(screenshot_path)
-            print(f"📸 Screenshot saved: {screenshot_path}")  # Log the screenshot path
+        os.makedirs(screenshot_dir, exist_ok=True)  # Ensure the directories exist
+
+        screenshot_path = os.path.join(screenshot_dir, filename)
+        self.driver.save_screenshot(screenshot_path)
+
+        # Attach screenshot to Allure Report
+        with open(screenshot_path, "rb") as image_file:
+            allure.attach(image_file.read(), name=step_name, attachment_type=allure.attachment_type.PNG)
+
+        print(f"Screenshot saved: {screenshot_path}")  # Debugging output
+
+
+
