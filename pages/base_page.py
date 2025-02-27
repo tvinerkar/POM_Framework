@@ -59,6 +59,7 @@ class BasePage:
     #     self.driver.save_screenshot(screenshot_path)
     #     print(f"Screenshot saved: {screenshot_path}")
 
+
     def capture_screenshot(self, test_name, step_name):
         browser_name = self.driver.capabilities['browserName']
         browser_version = self.driver.capabilities['browserVersion']
