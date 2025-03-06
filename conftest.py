@@ -1,4 +1,6 @@
 import os
+
+import allure
 import pytest
 import sys
 from datetime import datetime
@@ -10,6 +12,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from _pytest.runner import TestReport  # Import for type hinting
+import pytest
+from _pytest.reports import TestReport
 
 def pytest_addoption(parser):
     """Command-line option to select browsers for parallel execution."""
@@ -31,6 +35,8 @@ def driver(request):
         driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
     else:
         raise ValueError("Unsupported browser! Choose from chrome, firefox, or edge.")
+
+
 
     # Fetch browser version
     browser_version = driver.capabilities["browserVersion"]
@@ -90,31 +96,57 @@ def pytest_runtest_makereport(item, call):
                 extra.append(extras.image(failed_screenshot_path))
                 report.extra = extra
 
+# @pytest.hookimpl(tryfirst=True, hookwrapper=True)
+# def pytest_runtest_teardown(item, nextitem):
+#     """Save screenshots of successful test cases in the screenshots folder."""
+#     outcome = yield
+#     report: TestReport = outcome.get_result()
+#
+#     if report.when == "call" and report.passed:
+#         driver = item.funcargs.get("driver", None)
+#         if driver:
+#             test_name = item.nodeid.split("::")[-2] if len(item.nodeid.split("::")) > 1 else "UnknownTest"
+#             step_name = item.nodeid.split("::")[-1].replace("test_", "").replace("_", " ").capitalize()
+#             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+#             browser = item.funcargs["request"].cls.browser_name
+#             version = item.funcargs["request"].cls.browser_version
+#
+#             # Save screenshot in the Screenshots folder
+#             screenshot_path = os.path.join(item.funcargs["request"].cls.screenshot_folder, f"{test_name}_{step_name}_{browser}_{version}_{timestamp}.png")
+#             driver.save_screenshot(screenshot_path)
+#             print(f"📸 Passed screenshot saved: {screenshot_path}")
+
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_teardown(item, nextitem):
+def pytest_runtest_teardown(item):
     """Save screenshots of successful test cases in the screenshots folder."""
     outcome = yield
-    report: TestReport = outcome.get_result()
+    reports = outcome.get_result()
 
-    if report.when == "call" and report.passed:
-        driver = item.funcargs.get("driver", None)
-        if driver:
+    # Ensure reports is always iterable (list or single object)
+    if not isinstance(reports, list):
+        reports = [reports]
+
+    for report in reports:
+        if report.when == "call" and report.passed:
             test_name = item.nodeid.split("::")[-2] if len(item.nodeid.split("::")) > 1 else "UnknownTest"
             step_name = item.nodeid.split("::")[-1].replace("test_", "").replace("_", " ").capitalize()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
             browser = item.funcargs["request"].cls.browser_name
             version = item.funcargs["request"].cls.browser_version
-
-            # Save screenshot in the Screenshots folder
-            screenshot_path = os.path.join(item.funcargs["request"].cls.screenshot_folder, f"{test_name}_{step_name}_{browser}_{version}_{timestamp}.png")
+            screenshot_filename = f"{test_name}_{step_name}_{browser}_{timestamp}.png"
+            screenshot_path = os.path.join(item.funcargs["request"].cls.screenshot_folder,screenshot_filename+".png")
             driver.save_screenshot(screenshot_path)
             print(f"📸 Passed screenshot saved: {screenshot_path}")
 
+            # Take Screenshot
+            item.cls.driver.save_screenshot(screenshot_path)
+            allure.attach.file(screenshot_path, name=test_name, attachment_type=allure.attachment_type.PNG)
+
 def pytest_configure(config):
     """Generate timestamped test report automatically in the report folder."""
-    timestamp = datetime.now().strftime("%Y%m%d")
-    parent_folder = os.path.join(os.getcwd(), "report", f"test_guest_checkout_{timestamp}")
-    report_folder = os.path.join(parent_folder, f"test_guest_checkout_{timestamp}_report")
+    timestamp = datetime.now().strftime("%Y%m%d_%H")
+    parent_folder = os.path.join(os.getcwd(), "report", f"test_report_{timestamp}")
+    report_folder = os.path.join(parent_folder, f"test_report_{timestamp}_report")
 
     # Ensure report directory exists
     os.makedirs(report_folder, exist_ok=True)

@@ -1,5 +1,4 @@
 import time
-from datetime import datetime  # Correct way
 import os
 import allure
 from selenium.common import TimeoutException

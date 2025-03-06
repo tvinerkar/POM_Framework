@@ -1,7 +1,6 @@
-import sys
-import os
-import time
+##### WIP #####
 
+import time
 import allure
 import pytest
 from locators.locators import Live  # Ensure this contains the correct URL
@@ -10,15 +9,15 @@ from pages.product_page import ProductPage
 from pages.checkout_page import CheckoutPage
 
 @pytest.mark.usefixtures("driver")
-@allure.feature("Guest user checkout Feature")
-@allure.story("Valid Guest user checkout journey")
+@allure.feature("Validate new pages feature")
+@allure.story("Validate newly created pages content")
 @pytest.mark.usefixtures("driver")  # Using 'driver' fixture
 class TestGuestCheckout:
 
     @allure.title("Test Guest User checkout Functionality")
     @allure.description("This test verifies that a Guest user can successfully reach PTC page.")
     def test_guest_checkout(self):
-        test_name = "test_guest_checkout"  # Test case name for screenshots
+        test_name = "test_new_page_content_"  # Test case name for screenshots
         home = HomePage(self.driver)
         product = ProductPage(self.driver)
         checkout = CheckoutPage(self.driver)
