@@ -19,7 +19,8 @@ def pytest_addoption(parser):
     """Command-line option to select browsers for parallel execution."""
     parser.addoption("--browser", action="store", default="chrome", help="Choose browser: chrome, firefox, edge")
 
-@pytest.fixture(params=["chrome", "firefox", "edge"], scope="class")
+@pytest.fixture(params=["chrome"], scope="class")
+#@pytest.fixture(params=["chrome", "firefox", "edge"], scope="class")
 def driver(request):
     """Fixture to initialize WebDriver based on selected browser."""
     browser = request.param

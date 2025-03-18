@@ -71,8 +71,8 @@ class BasePage:
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tests/report"))
 
         # 🔥 Dynamically generate directory names with the current date
-        screenshot_dir = os.path.join(base_dir, f"test_guest_checkout_{date_stamp}",
-                                      f"test_guest_checkout_{date_stamp}_Screenshots")
+        screenshot_dir = os.path.join(base_dir, f"test_{date_stamp}",
+                                      f"{date_stamp}_Screenshots")
 
         os.makedirs(screenshot_dir, exist_ok=True)  # Ensure the directories exist
 
