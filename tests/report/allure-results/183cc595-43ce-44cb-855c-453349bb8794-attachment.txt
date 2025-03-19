@@ -1,0 +1,6 @@
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\01_HomePageLoaded.png
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\02_NewArrivals_page_Loaded.png
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\03_Best_sellers_page_Loaded.png
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\03_Shirts_page_Loaded.png
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\04_White_Shirts_page_Loaded.png
+✅ Screenshot saved: C:\Users\tejas.vinerkar\PycharmProjects\POM_Framework\tests\screenshots\test_menu_links\05_Ties_page_Loaded.png
